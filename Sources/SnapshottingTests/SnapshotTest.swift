@@ -16,6 +16,21 @@ import XCTest
 /// It provides mechanisms for filtering previews and supports different rendering strategies based on the platform.
 open class SnapshotTest: PreviewBaseTest, PreviewFilters {
 
+  ///
+  open class func isHeadlessSetup() -> Bool {
+    false
+  }
+
+  ///
+  open class func isRecording() -> Bool {
+    false
+  }
+
+  ///
+  open class func filePath() -> StaticString {
+    #file
+  }
+
   /// Returns an optional array of preview names to be included in the snapshot testing. This also supports Regex format.
   ///
   /// Override this method to specify which previews should be included in the snapshot test.
@@ -38,7 +53,13 @@ open class SnapshotTest: PreviewBaseTest, PreviewFilters {
   /// - Returns: A `RenderingStrategy` object suitable for the current environment.
   private static func getRenderingStrategy() -> RenderingStrategy {
     #if canImport(UIKit) && !os(watchOS) && !os(visionOS) && !os(tvOS)
-      return UIKitRenderingStrategy()
+      if Self.isHeadlessSetup() {
+        print("[DEBUG] Using headless setup")
+        return HeadlessRenderingStrategy()
+      } else {
+        print("[DEBUG] Using UIKit setup")
+        return UIKitRenderingStrategy()
+      }
     #elseif canImport(AppKit) && !targetEnvironment(macCatalyst)
       AppKitRenderingStrategy()
     #else
@@ -49,7 +70,6 @@ open class SnapshotTest: PreviewBaseTest, PreviewFilters {
     }
     #endif
   }
-  private static let renderingStrategy = getRenderingStrategy()
 
   static private var previews: [SnapshotPreviewsCore.PreviewType] = []
 
@@ -79,7 +99,7 @@ open class SnapshotTest: PreviewBaseTest, PreviewFilters {
 
     var result: SnapshotResult? = nil
     let expectation = XCTestExpectation()
-    Self.renderingStrategy.render(preview: preview) { snapshotResult in
+    Self.getRenderingStrategy().render(preview: preview) { snapshotResult in
       result = snapshotResult
       expectation.fulfill()
     }
@@ -89,12 +109,69 @@ open class SnapshotTest: PreviewBaseTest, PreviewFilters {
       return
     }
     do {
-      let attachment = try XCTAttachment(image: result.image.get())
-      attachment.name = preview.displayName
-      attachment.lifetime = .keepAlways
-      add(attachment)
+      let snapshotImage = try result.image.get()
+
+      let filePath = Self.filePath()
+      let fileUrl = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
+      let fileName = fileUrl.deletingLastPathComponent()
+      let snapshotDirectoryUrl = fileName.appendingPathComponent("snapshots")
+
+      if FileManager.default.fileExists(atPath: snapshotDirectoryUrl.path) == false {
+        try FileManager.default.createDirectory(at: snapshotDirectoryUrl, withIntermediateDirectories: true)
+      }
+
+      guard let snapshotName = preview.displayName else {
+        XCTFail("Can't get preview name, assign a name to preview")
+        return
+      }
+      let snapshotUrl = snapshotDirectoryUrl
+        .appendingPathComponent(sanitizePathComponent(snapshotName))
+        .appendingPathExtension("png")
+
+      if Self.isRecording() || FileManager.default.fileExists(atPath: snapshotUrl.path) == false {
+        // Record snapshot
+        try snapshotImage.pngData()?.write(to: snapshotUrl) // consider empty image for nil case
+        XCTFail("Recorded snapshot at \(snapshotUrl), re-run the test to assert against reference.")
+        return
+      }
+
+      let referenceImageData = try Data(contentsOf: snapshotUrl)
+      let referenceImage = UIImage(data: referenceImageData, scale: UIScreen.main.scale)!
+
+      let snapshotAttachment = XCTAttachment(image: snapshotImage)
+      snapshotAttachment.name = "Snapshot"
+      snapshotAttachment.lifetime = .keepAlways
+      add(snapshotAttachment)
+
+      let referenceAttachment = XCTAttachment(image: referenceImage)
+      referenceAttachment.name = "Reference"
+      referenceAttachment.lifetime = .keepAlways
+      add(referenceAttachment)
+
+      if imagesAreEqual(snapshotImage, referenceImage) {
+      } else {
+        XCTFail("Snapshot does not match reference. See attachments for details.")
+      }
     } catch {
       XCTFail("Error \(error)")
     }
   }
+
+
+}
+
+private func sanitizePathComponent(_ string: String) -> String {
+  return
+    string
+    .lowercased()
+    .replacingOccurrences(of: "\\W+", with: "-", options: .regularExpression)
+    .replacingOccurrences(of: "^-|-$", with: "", options: .regularExpression)
+}
+
+private func imagesAreEqual(_ image1: UIImage, _ image2: UIImage) -> Bool {
+    guard let data1 = image1.pngData(),
+          let data2 = image2.pngData() else {
+        return false
+    }
+    return data1 == data2
 }

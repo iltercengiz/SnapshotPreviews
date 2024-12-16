@@ -8,6 +8,16 @@
 import Foundation
 
 public protocol PreviewFilters {
+
+  ///
+  static func isHeadlessSetup() -> Bool
+
+  ///
+  static func isRecording() -> Bool
+
+  ///
+  static func filePath() -> StaticString
+  
   /// Override to return a list of previews that should be snapshotted. The default is null, which snapshots all previews.
   /// Elements should be the type name of the preview, like "MyModule.MyView_Previews". This also supports Regex format.
   ///

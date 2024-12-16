@@ -16,6 +16,21 @@ import XCTest
 /// It provides mechanisms for filtering previews and performs layout tests on different platforms.
 open class PreviewLayoutTest: PreviewBaseTest, PreviewFilters {
 
+  ///
+  open class func isHeadlessSetup() -> Bool {
+    false
+  }
+
+  ///
+  open class func isRecording() -> Bool {
+    false
+  }
+
+  ///
+  open class func filePath() -> StaticString {
+    #file
+  }
+
   /// Returns an optional array of preview names to be included in the snapshot testing. This also supports Regex format.
   ///
   /// Override this method to specify which previews should be included in the test.

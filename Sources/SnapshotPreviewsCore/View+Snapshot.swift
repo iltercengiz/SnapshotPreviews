@@ -196,20 +196,22 @@ extension CGSize {
 
 extension UIView {
   func render(size: CGSize, mode: EmergeRenderingMode?, context: CGContext) -> Bool {
-    switch mode {
-    case .coreAnimation:
-      layer.layerForSnapshot.render(in: context)
-      return true
-    case .uiView:
-      return drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
-    case .none:
-      if !size.requiresCoreAnimationSnapshot {
-        return drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
-      } else {
-        layer.layerForSnapshot.render(in: context)
-        return true
-      }
-    }
+    layer.layerForSnapshot.render(in: context)
+    return true
+//    switch mode {
+//    case .coreAnimation:
+//      layer.layerForSnapshot.render(in: context)
+//      return true
+//    case .uiView:
+//      return drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
+//    case .none:
+//      if !size.requiresCoreAnimationSnapshot {
+//        return drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
+//      } else {
+//        layer.layerForSnapshot.render(in: context)
+//        return true
+//      }
+//    }
   }
 }
 
